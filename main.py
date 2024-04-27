@@ -15,7 +15,7 @@ from sklearn.model_selection import GridSearchCV
 """
 Code used for the Kaggle contest "Tabular Playground Series August 2022"
 Link: https://www.kaggle.com/competitions/tabular-playground-series-aug-2022
-Best Model: Logistic Regression with a score of 0.5912
+Best Model: Logistic Regression with a score of 0.58912
 """
 
 pd.set_option("display.max_columns", None)
