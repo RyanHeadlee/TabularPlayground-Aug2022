@@ -2,8 +2,8 @@ import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
-from sklearn.preprocessing import LabelEncoder, StandardScaler
-from sklearn.compose import ColumnTransformer, make_column_selector
+from sklearn.preprocessing import StandardScaler, OneHotEncoder
+from sklearn.compose import make_column_selector, make_column_transformer
 from sklearn.linear_model import LogisticRegression
 from sklearn.neighbors import KNeighborsClassifier
 from sklearn.svm import SVC
@@ -85,35 +85,30 @@ for dataset in combined:
 # sns.histplot(df_train["loading"], kde=True)
 # plt.show()
 
-# Split the data into training and test sets
-x_train = df_train.drop(["failure"], axis=1)
+# Concat df_train w/o failure and df_test w/o id into a single data frame
+df_whole = pd.concat([df_train.drop("failure", axis=1), df_test.drop("id", axis=1)])
+
+# Column transformer to scale numerical features & encode categorical features
+ct = make_column_transformer(
+    (StandardScaler(), make_column_selector(dtype_include=np.number)),
+    (OneHotEncoder(sparse_output=False), make_column_selector(dtype_include=object)),
+)
+
+# Scale values & encode categorical features
+df_whole = ct.fit_transform(df_whole)
+
+# Split the data into test and train
+train_rows = df_train.shape[0]
+test_rows = df_test.shape[0]
+x_train = df_whole[:train_rows]
+x_test = df_whole[-test_rows:]
 y_train = df_train["failure"]
-x_test = df_test.drop(["id"], axis=1)
 
-# Create column transformer that scales numerical values
-ct = ColumnTransformer(
-    [("std_scaler", StandardScaler(), make_column_selector(dtype_include=np.number))],
-    remainder="passthrough",
-    verbose_feature_names_out=False,
-).set_output(transform="pandas")
-
-# Scale values for both x training and test
-x_train = ct.fit_transform(x_train)
-x_test = ct.transform(x_test)
-
-# Create label encoder
-le = LabelEncoder()
-
-# Encodes categorical features into numeric values
-for feature in ["product_code", "attribute_0", "attribute_1", "has_null"]:
-    x_train[feature] = le.fit_transform(x_train[feature])
-    x_test[feature] = le.fit_transform(x_test[feature])
-
-# # Create the model (Logistic Regression)
-# # Kaggle Private Score: 0.58912
-# model = LogisticRegression()
-# model.fit(x_train, y_train)
-# predictions = model.predict_proba(x_test)
+# Create the model (Logistic Regression)
+# Kaggle Private Score: 0.58912
+model = LogisticRegression()
+model.fit(x_train, y_train)
+predictions = model.predict_proba(x_test)
 
 # # Create the model (KNeighbors)
 # # Kaggle Private Score: 0.51692 (pre has_null)
@@ -135,26 +130,26 @@ for feature in ["product_code", "attribute_0", "attribute_1", "has_null"]:
 # clf_isotonic.fit(x_train, y_train)
 # predictions = clf_isotonic.predict_proba(x_test)
 
-# Best parameters from grid search best_params_ attribute
-best_params = {
-    "criterion": ["log_loss"],
-    "max_depth": [10],
-    "min_samples_split": [10],
-    "min_samples_leaf": [1],
-}
+# # Best parameters from grid search best_params_ attribute
+# best_params = {
+#     "criterion": ["log_loss"],
+#     "max_depth": [10],
+#     "min_samples_split": [10],
+#     "min_samples_leaf": [1],
+# }
 
-# Create the model (Decision Tree & GridSearch)
-# Kaggle Private Score: 0.55574
-model = DecisionTreeClassifier()
-grid_search = GridSearchCV(
-    estimator=model,
-    param_grid=best_params,
-    cv=5,
-    scoring="accuracy",
-    n_jobs=1,
-)
-grid_search.fit(x_train, y_train)
-predictions = grid_search.predict_proba(x_test)
+# # Create the model (Decision Tree & GridSearch)
+# # Kaggle Private Score: 0.55574
+# model = DecisionTreeClassifier()
+# grid_search = GridSearchCV(
+#     estimator=model,
+#     param_grid=best_params,
+#     cv=5,
+#     scoring="accuracy",
+#     n_jobs=1,
+# )
+# grid_search.fit(x_train, y_train)
+# predictions = grid_search.predict_proba(x_test)
 
 # Create submission df that has id and probability of failure
 df_submission = pd.DataFrame(data={"id": df_test["id"], "failure": predictions[:, 1]})
